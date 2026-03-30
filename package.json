@@ -1,0 +1,15 @@
+{
+  "name": "food-logistics-chatbot",
+  "version": "1.0.0",
+  "description": "食品物流センター向けQ&Aチャットボット",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup": "node scripts/create_sample_excel.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
+    "express": "^4.18.2",
+    "xlsx": "^0.18.5"
+  }
+}
