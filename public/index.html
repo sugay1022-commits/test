@@ -3,32 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>食品物流センター Q&Aチャットボット</title>
+  <title>AI営業コーチング PoC</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green: #1a6b3c;
-      --green-dark: #125430;
-      --green-light: #e8f5ee;
-      --blue: #1976d2;
-      --gray-bg: #f0f4f8;
-      --gray-border: #dde3ea;
-      --shadow: 0 1px 6px rgba(0,0,0,0.1);
+      --navy: #1f3a5f;
+      --navy-dark: #16293f;
+      --gold: #c8a04d;
+      --bg: #f2f4f7;
+      --border: #dde3ea;
+      --shadow: 0 1px 6px rgba(0,0,0,0.08);
     }
 
     body {
       font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
-      background: var(--gray-bg);
+      background: var(--bg);
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    /* ヘッダー */
     header {
-      background: var(--green);
+      background: var(--navy);
       color: #fff;
       padding: 0 20px;
       height: 56px;
@@ -39,422 +37,262 @@
       flex-shrink: 0;
       z-index: 10;
     }
-    header .logo { font-size: 1.5rem; }
+    header .logo { font-size: 1.4rem; }
     header h1 { font-size: 1.05rem; font-weight: 700; }
-    header .sub { font-size: 0.72rem; opacity: 0.8; margin-top: 1px; }
+    header .sub { font-size: 0.7rem; opacity: 0.75; margin-top: 1px; }
     .mode-badge {
-      margin-left: auto;
       font-size: 0.72rem;
       padding: 3px 10px;
       border-radius: 20px;
       font-weight: 600;
     }
-    .mode-badge.claude { background: rgba(255,255,255,0.2); }
-    .mode-badge.demo   { background: rgba(255,200,0,0.3); color: #ffe066; }
-    .kb-count {
-      font-size: 0.72rem;
-      opacity: 0.8;
-      padding: 3px 10px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.12);
-    }
-
-    /* メインレイアウト */
-    .main {
+    .mode-badge.claude { background: rgba(255,255,255,0.18); }
+    .mode-badge.demo   { background: rgba(255,200,0,0.25); color: #ffe066; }
+    .header-actions {
+      margin-left: auto;
       display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    /* サイドバー */
-    .sidebar {
-      width: 220px;
-      background: #fff;
-      border-right: 1px solid var(--gray-border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    .sidebar-header {
-      padding: 12px 14px 8px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #555;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      border-bottom: 1px solid var(--gray-border);
-    }
-    .category-list {
-      overflow-y: auto;
-      flex: 1;
-    }
-    .cat-item {
-      padding: 9px 14px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      color: #444;
-      display: flex;
-      align-items: center;
       gap: 8px;
-      transition: background 0.15s;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .cat-item:hover { background: var(--green-light); }
-    .cat-item.active { background: var(--green-light); color: var(--green); font-weight: 600; }
-    .cat-icon { font-size: 1rem; width: 20px; text-align: center; }
-
-    /* Q&Aパネル */
-    .qa-panel {
-      width: 280px;
-      background: #fafbfc;
-      border-right: 1px solid var(--gray-border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      overflow: hidden;
-      transition: width 0.2s;
-    }
-    .qa-panel.hidden { width: 0; border: none; }
-    .qa-panel-header {
-      padding: 10px 14px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--green);
-      border-bottom: 1px solid var(--gray-border);
-      display: flex;
-      justify-content: space-between;
       align-items: center;
     }
-    .qa-list {
-      overflow-y: auto;
-      flex: 1;
-      padding: 8px;
-    }
-    .qa-card {
-      background: #fff;
-      border: 1px solid var(--gray-border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: box-shadow 0.15s, border-color 0.15s;
-    }
-    .qa-card:hover { box-shadow: var(--shadow); border-color: #bcd4c8; }
-    .qa-card .q { font-size: 0.8rem; font-weight: 600; color: #333; margin-bottom: 4px; }
-    .qa-card .a { font-size: 0.75rem; color: #666; line-height: 1.5;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-    /* チャットエリア */
-    .chat-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      scroll-behavior: smooth;
-    }
-
-    /* ウェルカム */
-    .welcome {
-      margin: auto;
-      text-align: center;
-      color: #666;
-      padding: 20px;
-      max-width: 420px;
-    }
-    .welcome .big-icon { font-size: 3rem; margin-bottom: 10px; }
-    .welcome h2 { font-size: 1.05rem; color: var(--green); margin-bottom: 8px; }
-    .welcome p { font-size: 0.85rem; line-height: 1.7; }
-    .suggestions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      justify-content: center;
-      margin-top: 14px;
-    }
-    .sug-btn {
-      background: #fff;
-      border: 1.5px solid var(--green);
-      color: var(--green);
-      padding: 6px 12px;
+    .btn-export {
+      font-size: 0.72rem;
+      padding: 5px 12px;
       border-radius: 20px;
-      font-size: 0.78rem;
+      background: var(--gold);
+      color: #2a2210;
+      border: none;
       cursor: pointer;
-      transition: all 0.2s;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-block;
     }
-    .sug-btn:hover { background: var(--green); color: #fff; }
+    .btn-export:hover { opacity: 0.9; }
 
-    /* メッセージ */
-    .msg {
-      display: flex;
-      gap: 9px;
-      max-width: 720px;
-      animation: fadeUp 0.2s ease;
-    }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
-    .msg.bot  { align-self: flex-start; }
+    .main { display: flex; flex: 1; overflow: hidden; }
 
-    .avatar {
-      width: 32px; height: 32px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-    .msg.user .avatar { background: var(--blue); color: #fff; }
-    .msg.bot  .avatar { background: var(--green); color: #fff; }
-
-    .bubble {
-      padding: 10px 14px;
-      border-radius: 14px;
-      line-height: 1.65;
-      font-size: 0.88rem;
-      max-width: 580px;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
-    .msg.user .bubble {
-      background: var(--blue);
-      color: #fff;
-      border-bottom-right-radius: 3px;
-    }
-    .msg.bot .bubble {
+    .sidebar {
+      width: 260px;
       background: #fff;
-      color: #222;
-      border-bottom-left-radius: 3px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 14px;
+      font-size: 0.78rem;
+      color: #444;
+    }
+    .sidebar h2 { font-size: 0.8rem; color: var(--navy); margin-bottom: 8px; }
+    .sidebar ul { list-style: none; margin-bottom: 16px; }
+    .sidebar li { padding: 4px 0; border-bottom: 1px dashed #eee; line-height: 1.5; }
+    .pb-item { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+    .pb-item .pb-type { display: inline-block; font-size: 0.65rem; background: var(--navy); color: #fff; border-radius: 4px; padding: 1px 6px; margin-bottom: 3px; }
+    .pb-item .pb-title { font-weight: 600; color: #333; }
+
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    .report-form {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      max-width: 560px;
       box-shadow: var(--shadow);
+      margin: auto;
     }
-    .bubble.typing::after {
-      content: '▋';
-      animation: blink 0.6s infinite;
+    .report-form h2 { font-size: 1rem; color: var(--navy); margin-bottom: 4px; }
+    .report-form p { font-size: 0.8rem; color: #777; margin-bottom: 14px; }
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .form-row label { font-size: 0.75rem; color: #555; display: block; margin-bottom: 4px; }
+    .form-row select, .form-row input {
+      width: 100%; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.85rem;
     }
+    .form-col { flex: 1; min-width: 120px; }
+    .form-textarea {
+      width: 100%; min-height: 90px; padding: 8px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 0.85rem; font-family: inherit; resize: vertical;
+    }
+    .btn-primary {
+      background: var(--navy); color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 0.88rem; cursor: pointer; margin-top: 10px;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--navy-dark); }
+    .btn-primary:disabled { background: #9aa6b5; cursor: not-allowed; }
+
+    .msg { display: flex; gap: 9px; max-width: 720px; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg.bot { align-self: flex-start; }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0; margin-top: 2px;
+    }
+    .msg.user .avatar { background: #1976d2; color: #fff; }
+    .msg.bot .avatar { background: var(--navy); color: #fff; }
+    .bubble {
+      padding: 10px 14px; border-radius: 14px; line-height: 1.65;
+      font-size: 0.88rem; max-width: 580px; word-break: break-word; white-space: pre-wrap;
+    }
+    .msg.user .bubble { background: #1976d2; color: #fff; border-bottom-right-radius: 3px; }
+    .msg.bot .bubble { background: #fff; color: #222; border-bottom-left-radius: 3px; box-shadow: var(--shadow); }
+    .bubble.typing::after { content: '▋'; animation: blink 0.6s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-    /* 入力エリア */
+    .meta-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tag {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; background: #eef1f5; color: #555;
+    }
+    .tag.intervention { background: #fde2e2; color: #b3261e; font-weight: 700; }
+
     .input-area {
-      background: #fff;
-      border-top: 1px solid var(--gray-border);
-      padding: 12px 16px;
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-      flex-shrink: 0;
+      background: #fff; border-top: 1px solid var(--border);
+      padding: 12px 16px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
     }
-    textarea {
-      flex: 1;
-      border: 1.5px solid var(--gray-border);
-      border-radius: 10px;
-      padding: 9px 12px;
-      font-size: 0.88rem;
-      font-family: inherit;
-      resize: none;
-      outline: none;
-      line-height: 1.5;
-      max-height: 100px;
-      transition: border-color 0.2s;
+    textarea#input {
+      flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 12px;
+      font-size: 0.88rem; font-family: inherit; resize: none; outline: none; line-height: 1.5; max-height: 100px;
     }
-    textarea:focus { border-color: var(--green); }
-    textarea::placeholder { color: #bbb; }
-
+    textarea#input:focus { border-color: var(--navy); }
     .btn-send {
-      background: var(--green);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 0 18px;
-      height: 40px;
-      font-size: 0.88rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      white-space: nowrap;
+      background: var(--navy); color: #fff; border: none; border-radius: 10px;
+      padding: 0 18px; height: 40px; font-size: 0.88rem; cursor: pointer; white-space: nowrap;
     }
-    .btn-send:hover:not(:disabled) { background: var(--green-dark); }
-    .btn-send:disabled { background: #9cbfad; cursor: not-allowed; }
+    .btn-send:hover:not(:disabled) { background: var(--navy-dark); }
+    .btn-send:disabled { background: #9aa6b5; cursor: not-allowed; }
 
-    .btn-icon {
-      background: transparent;
-      border: 1px solid var(--gray-border);
-      border-radius: 8px;
-      height: 40px;
-      width: 40px;
-      font-size: 1rem;
-      cursor: pointer;
-      color: #666;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    .btn-icon:hover { border-color: var(--green); color: var(--green); }
-
-    /* スクロールバー */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #c8d4de; border-radius: 4px; }
+    .hidden { display: none !important; }
 
     @media (max-width: 768px) {
-      .sidebar, .qa-panel { display: none; }
+      .sidebar { display: none; }
     }
   </style>
 </head>
 <body>
   <header>
-    <span class="logo">🏭</span>
+    <span class="logo">🧭</span>
     <div>
-      <h1>食品物流センター Q&Aチャットボット</h1>
-      <div class="sub">ナレッジベースに基づいてご質問にお答えします</div>
+      <h1>AI営業コーチング PoC</h1>
+      <div class="sub">活動報告 → AIコーチによる即時フィードバック</div>
     </div>
-    <span class="kb-count" id="kb-count">KB: 読み込み中</span>
     <span class="mode-badge" id="mode-badge">...</span>
+    <div class="header-actions">
+      <a class="btn-export" href="/dashboard.html">📈 進捗ダッシュボード</a>
+      <button class="btn-export" onclick="exportLogs()">📊 ログ出力</button>
+    </div>
   </header>
 
   <div class="main">
-    <!-- カテゴリサイドバー -->
     <nav class="sidebar">
-      <div class="sidebar-header">📂 カテゴリ</div>
-      <div class="category-list" id="cat-list">
-        <div class="cat-item active" data-cat="" onclick="selectCategory(this, '')">
-          <span class="cat-icon">📋</span>すべて
-        </div>
-      </div>
+      <h2>📐 フィードバック評価軸</h2>
+      <ul id="axes-list"></ul>
+      <h2>📘 playbook（参照ノウハウ）</h2>
+      <div id="playbook-list"></div>
     </nav>
 
-    <!-- Q&Aパネル -->
-    <div class="qa-panel" id="qa-panel">
-      <div class="qa-panel-header">
-        <span id="qa-panel-title">Q&A一覧</span>
-        <span style="font-size:0.72rem;color:#888" id="qa-count"></span>
-      </div>
-      <div class="qa-list" id="qa-list"></div>
-    </div>
-
-    <!-- チャットエリア -->
     <div class="chat-area">
       <div class="chat-messages" id="chat">
-        <div class="welcome" id="welcome">
-          <div class="big-icon">🥦🚚📦</div>
-          <h2>食品物流センター サポートチャット</h2>
-          <p>業務に関するご質問をどうぞ。<br>左のカテゴリからQ&Aを参照するか、<br>チャットで質問してください。</p>
-          <div class="suggestions">
-            <button class="sug-btn" onclick="sendSug(this)">冷蔵品の保管温度は？</button>
-            <button class="sug-btn" onclick="sendSug(this)">入荷検品の手順</button>
-            <button class="sug-btn" onclick="sendSug(this)">フォークリフトの安全確認</button>
-            <button class="sug-btn" onclick="sendSug(this)">火災発生時の対応</button>
-            <button class="sug-btn" onclick="sendSug(this)">賞味期限の管理方法</button>
-            <button class="sug-btn" onclick="sendSug(this)">内線番号一覧</button>
+        <div class="report-form" id="report-form">
+          <h2>活動報告フォーム</h2>
+          <p>本日の活動について報告してください。AIコーチが上長視点でフィードバックします。</p>
+          <div class="form-row">
+            <div class="form-col">
+              <label>顧客区分</label>
+              <select id="customerType">
+                <option value="個人・既契約">個人・既契約</option>
+                <option value="個人・新規">個人・新規</option>
+                <option value="法人・既契約">法人・既契約</option>
+                <option value="法人・新規">法人・新規</option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label>活動種別</label>
+              <select id="activityType">
+                <option value="コール(架電)">コール(架電)</option>
+                <option value="初回面談(初訪)">初回面談(初訪)</option>
+                <option value="アポ・再訪">アポ・再訪</option>
+                <option value="提案">提案</option>
+                <option value="既契約の見直し提案">既契約の見直し提案</option>
+                <option value="契約・成約">契約・成約</option>
+                <option value="フォロー">フォロー</option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label>見込み度</label>
+              <select id="prospectLevel">
+                <option value="高">高</option>
+                <option value="中" selected>中</option>
+                <option value="低">低</option>
+              </select>
+            </div>
           </div>
+          <label>活動報告・相談内容</label>
+          <textarea class="form-textarea" id="report-text" placeholder="例：本日◯◯様を訪問し、更新時期の契約内容を確認した。新たな提案には反応が薄く、検討すると言われた。"></textarea>
+          <button class="btn-primary" id="submit-report" onclick="submitReport()">報告する</button>
         </div>
       </div>
 
-      <div class="input-area">
-        <textarea id="input" rows="1" placeholder="質問を入力（例：冷凍品の温度管理は？）"></textarea>
-        <button class="btn-icon" onclick="reloadKB()" title="KB再読込">🔄</button>
-        <button class="btn-send" id="send-btn" onclick="sendMessage()">送信</button>
+      <div class="input-area hidden" id="input-area">
+        <textarea id="input" rows="1" placeholder="AIコーチへの追加の相談を入力（Shift+Enterで改行）"></textarea>
+        <button class="btn-send" id="send-btn" onclick="sendFollowUp()">送信</button>
       </div>
     </div>
   </div>
 
   <script>
-    const chatEl   = document.getElementById('chat');
-    const inputEl  = document.getElementById('input');
-    const sendBtn  = document.getElementById('send-btn');
-    const kbCount  = document.getElementById('kb-count');
+    const chatEl = document.getElementById('chat');
     const modeBadge = document.getElementById('mode-badge');
-    const qaPanel  = document.getElementById('qa-panel');
-    const qaList   = document.getElementById('qa-list');
-    const qaTitle  = document.getElementById('qa-panel-title');
-    const qaCountEl = document.getElementById('qa-count');
-    const catList  = document.getElementById('cat-list');
+    const axesList = document.getElementById('axes-list');
+    const playbookList = document.getElementById('playbook-list');
+    const reportForm = document.getElementById('report-form');
+    const inputArea = document.getElementById('input-area');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const submitBtn = document.getElementById('submit-report');
 
     let history = [];
-    let isStreaming = false;
-    const catIcons = {
-      '温度管理': '🌡️', '入出荷': '📦', '安全・衛生': '🦺',
-      '在庫管理': '📊', '緊急対応': '🚨', '業務ルール': '📋',
-      '施設・設備': '🏢', '一般': '📌',
-    };
+    let reportMeta = null;
+    let busy = false;
 
-    // 初期化
     async function init() {
-      const res = await fetch('/api/knowledge-count').then(r => r.json());
-      kbCount.textContent = `KB: ${res.count} 件`;
-      if (res.mode === 'claude') {
-        modeBadge.textContent = '✅ Claude RAGモード';
+      const meta = await fetch('/api/meta').then(r => r.json());
+      if (meta.mode === 'claude') {
+        modeBadge.textContent = '✅ Claudeモード';
         modeBadge.className = 'mode-badge claude';
       } else {
         modeBadge.textContent = '🔶 デモモード';
         modeBadge.className = 'mode-badge demo';
       }
-      loadCategories();
-      loadQA('');
-    }
+      for (const axis of meta.evaluationAxes) {
+        const li = document.createElement('li');
+        li.textContent = axis;
+        axesList.appendChild(li);
+      }
 
-    async function loadCategories() {
-      const { categories } = await fetch('/api/categories').then(r => r.json());
-      for (const cat of categories) {
+      const playbook = await fetch('/api/playbook').then(r => r.json());
+      const all = [
+        ...(playbook.winningPatterns || []).map(p => ({ type: '勝ちパターン', title: p.title })),
+        ...(playbook.talkScripts || []).map(p => ({ type: 'トークスクリプト', title: p.scene })),
+        ...(playbook.objectionHandling || []).map(p => ({ type: '反論対応', title: p.objection })),
+      ];
+      for (const item of all) {
         const div = document.createElement('div');
-        div.className = 'cat-item';
-        div.dataset.cat = cat;
-        div.innerHTML = `<span class="cat-icon">${catIcons[cat] || '📌'}</span>${cat}`;
-        div.onclick = () => selectCategory(div, cat);
-        catList.appendChild(div);
+        div.className = 'pb-item';
+        div.innerHTML = `<span class="pb-type">${item.type}</span><div class="pb-title">${item.title}</div>`;
+        playbookList.appendChild(div);
       }
-    }
-
-    async function loadQA(category) {
-      const url = '/api/qa' + (category ? `?category=${encodeURIComponent(category)}` : '');
-      const { items } = await fetch(url).then(r => r.json());
-      qaList.innerHTML = '';
-      qaCountEl.textContent = `${items.length} 件`;
-      qaTitle.textContent = category || 'すべてのQ&A';
-      for (const item of items) {
-        const card = document.createElement('div');
-        card.className = 'qa-card';
-        card.innerHTML = `<div class="q">Q: ${item.question}</div><div class="a">${item.answer}</div>`;
-        card.onclick = () => {
-          inputEl.value = item.question;
-          sendMessage();
-        };
-        qaList.appendChild(card);
-      }
-    }
-
-    function selectCategory(el, cat) {
-      document.querySelectorAll('.cat-item').forEach(i => i.classList.remove('active'));
-      el.classList.add('active');
-      loadQA(cat);
-    }
-
-    // テキストエリア自動リサイズ
-    inputEl.addEventListener('input', () => {
-      inputEl.style.height = 'auto';
-      inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
-    });
-    inputEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
-
-    function removeWelcome() {
-      const w = document.getElementById('welcome');
-      if (w) w.remove();
     }
 
     function addMessage(role, text, streaming = false) {
-      removeWelcome();
       const wrap = document.createElement('div');
       wrap.className = `msg ${role}`;
       const av = document.createElement('div');
       av.className = 'avatar';
-      av.textContent = role === 'user' ? '👤' : '🤖';
+      av.textContent = role === 'user' ? '👤' : '🧭';
       const bubble = document.createElement('div');
       bubble.className = 'bubble' + (streaming ? ' typing' : '');
       bubble.textContent = text;
@@ -462,14 +300,86 @@
       wrap.appendChild(bubble);
       chatEl.appendChild(wrap);
       chatEl.scrollTop = chatEl.scrollHeight;
-      return bubble;
+      return wrap;
     }
 
-    async function sendMessage() {
-      const text = inputEl.value.trim();
-      if (!text || isStreaming) return;
+    function addMetaTags(wrap, data) {
+      const tags = document.createElement('div');
+      tags.className = 'meta-tags';
+      if (data.intervention && data.intervention.flag) {
+        const t = document.createElement('span');
+        t.className = 'tag intervention';
+        t.textContent = '⚠ 上長エスカレーション推奨: ' + data.intervention.reason;
+        tags.appendChild(t);
+      }
+      for (const item of (data.playbookItemsUsed || [])) {
+        const t = document.createElement('span');
+        t.className = 'tag';
+        t.textContent = `📘 ${item.type}: ${item.title}`;
+        tags.appendChild(t);
+      }
+      if (tags.children.length > 0) wrap.appendChild(tags);
+    }
 
-      isStreaming = true;
+    async function postReport(message) {
+      const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reporterId: 'demo-user',
+          ...reportMeta,
+          message,
+          history,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'エラーが発生しました');
+      }
+      return res.json();
+    }
+
+    async function submitReport() {
+      const text = document.getElementById('report-text').value.trim();
+      if (!text || busy) return;
+      busy = true;
+      submitBtn.disabled = true;
+
+      reportMeta = {
+        customerType: document.getElementById('customerType').value,
+        activityType: document.getElementById('activityType').value,
+        prospectLevel: document.getElementById('prospectLevel').value,
+      };
+
+      reportForm.classList.add('hidden');
+      addMessage('user', text);
+      history.push({ role: 'user', content: text });
+
+      const botWrap = addMessage('bot', 'コーチが確認しています…', true);
+
+      try {
+        const data = await postReport(text);
+        const bubble = botWrap.querySelector('.bubble');
+        bubble.classList.remove('typing');
+        bubble.textContent = data.reply;
+        addMetaTags(botWrap, data);
+        history.push({ role: 'assistant', content: data.reply });
+        inputArea.classList.remove('hidden');
+        inputEl.focus();
+      } catch (err) {
+        const bubble = botWrap.querySelector('.bubble');
+        bubble.classList.remove('typing');
+        bubble.textContent = '❌ ' + err.message;
+      } finally {
+        busy = false;
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function sendFollowUp() {
+      const text = inputEl.value.trim();
+      if (!text || busy) return;
+      busy = true;
       sendBtn.disabled = true;
       inputEl.value = '';
       inputEl.style.height = 'auto';
@@ -477,73 +387,36 @@
       addMessage('user', text);
       history.push({ role: 'user', content: text });
 
-      const botBubble = addMessage('bot', '', true);
+      const botWrap = addMessage('bot', '考えています…', true);
 
       try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: history.slice(0, -1) }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          botBubble.classList.remove('typing');
-          botBubble.textContent = '❌ ' + (err.error || 'エラーが発生しました');
-          return;
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.text) {
-                fullText += data.text;
-                botBubble.textContent = fullText;
-                chatEl.scrollTop = chatEl.scrollHeight;
-              } else if (data.done) {
-                botBubble.classList.remove('typing');
-                history.push({ role: 'assistant', content: fullText });
-              } else if (data.error) {
-                botBubble.classList.remove('typing');
-                botBubble.textContent = '❌ ' + data.error;
-              }
-            } catch {}
-          }
-        }
-        botBubble.classList.remove('typing');
+        const data = await postReport(text);
+        const bubble = botWrap.querySelector('.bubble');
+        bubble.classList.remove('typing');
+        bubble.textContent = data.reply;
+        addMetaTags(botWrap, data);
+        history.push({ role: 'assistant', content: data.reply });
       } catch (err) {
-        botBubble.classList.remove('typing');
-        botBubble.textContent = '❌ 通信エラー: ' + err.message;
+        const bubble = botWrap.querySelector('.bubble');
+        bubble.classList.remove('typing');
+        bubble.textContent = '❌ ' + err.message;
       } finally {
-        isStreaming = false;
+        busy = false;
         sendBtn.disabled = false;
         inputEl.focus();
       }
     }
 
-    function sendSug(btn) {
-      inputEl.value = btn.textContent;
-      sendMessage();
-    }
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+    });
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFollowUp(); }
+    });
 
-    async function reloadKB() {
-      const res = await fetch('/api/reload', { method: 'POST' });
-      const data = await res.json();
-      kbCount.textContent = `KB: ${data.count} 件`;
-      loadCategories();
-      loadQA('');
+    function exportLogs() {
+      window.location.href = '/api/logs/export';
     }
 
     init();

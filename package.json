@@ -1,11 +1,11 @@
 {
-  "name": "food-logistics-chatbot",
-  "version": "1.0.0",
-  "description": "食品物流センター向けQ&Aチャットボット",
+  "name": "insurance-sales-coaching-poc",
+  "version": "0.1.0",
+  "description": "保険代理店向け AI 営業コーチング基盤 初期PoC",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "setup": "node scripts/create_sample_excel.js"
+    "export-logs": "node scripts/export_logs.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
