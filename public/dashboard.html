@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>進捗ダッシュボード | AI営業コーチング PoC</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #1f3a5f;
+      --navy-dark: #16293f;
+      --gold: #c8a04d;
+      --bg: #f2f4f7;
+      --border: #dde3ea;
+      --shadow: 0 1px 6px rgba(0,0,0,0.08);
+      --danger: #b3261e;
+      --danger-bg: #fde2e2;
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      background: var(--bg);
+      color: #333;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 0 20px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .logo { font-size: 1.4rem; }
+    header h1 { font-size: 1.05rem; font-weight: 700; }
+    header .sub { font-size: 0.7rem; opacity: 0.75; margin-top: 1px; }
+    .mode-badge {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .mode-badge.claude { background: rgba(255,255,255,0.18); }
+    .mode-badge.demo   { background: rgba(255,200,0,0.25); color: #ffe066; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .btn-export {
+      font-size: 0.72rem;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: var(--gold);
+      color: #2a2210;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-export:hover { opacity: 0.9; }
+    .btn-export.outline {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+    .btn-export .refresh-icon { display: inline-block; transition: transform 0.5s ease; }
+    .btn-export.spinning .refresh-icon { transform: rotate(360deg); }
+
+    .dashboard-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* KPIカード */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      order: 0;
+    }
+    .kpi-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 16px 18px;
+    }
+    .kpi-card .kpi-label { font-size: 0.75rem; color: #777; margin-bottom: 6px; }
+    .kpi-card .kpi-value { font-size: 1.8rem; font-weight: 700; color: var(--navy); }
+    .kpi-card .kpi-sub { font-size: 0.7rem; color: #999; margin-top: 4px; }
+    .kpi-card.danger {
+      border-left: 4px solid var(--danger);
+      background: linear-gradient(to right, var(--danger-bg) 0%, #fff 60%);
+    }
+    .kpi-card.danger .kpi-value { color: var(--danger); }
+
+    /* レイアウト */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 20px;
+    }
+    .left-col, .right-col { display: flex; flex-direction: column; gap: 20px; }
+    .right-col { order: 1; }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .panel h2 {
+      font-size: 0.95rem;
+      color: var(--navy);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .panel h2 .count-badge {
+      font-size: 0.7rem;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 10px;
+      padding: 1px 8px;
+      font-weight: 700;
+    }
+    .panel.danger-accent { border-left: 4px solid var(--danger); }
+
+    /* 担当者カード */
+    .rep-card {
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .rep-card:last-child { border-bottom: none; }
+    .rep-card-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .rep-card-head .rep-name { font-weight: 700; color: var(--navy); font-size: 0.92rem; }
+    .rep-card-head .rep-name.unspecified { color: #999; font-style: italic; font-weight: 600; }
+    .rep-card-head .rep-count {
+      font-size: 0.68rem; background: #eef1f5; color: #555; border-radius: 10px; padding: 1px 8px;
+    }
+    .rep-card-head .rep-alert {
+      font-size: 0.68rem; background: var(--danger-bg); color: var(--danger); border-radius: 10px;
+      padding: 1px 8px; font-weight: 700;
+    }
+    .rep-card-head .rep-time { margin-left: auto; font-size: 0.7rem; color: #999; }
+
+    /* 活動種別 横棒積み上げグラフ */
+    .activity-bar {
+      display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #f0f0f0; margin-bottom: 8px;
+    }
+    .activity-bar .seg {
+      flex-grow: 0.01;
+      transition: flex-grow 0.4s ease;
+    }
+
+    /* 見込み度タグ */
+    .level-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .level-tag {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+    }
+    .level-tag.level-高 { background: #fdf3df; color: #8a6d1f; }
+    .level-tag.level-中 { background: #eef1f5; color: #555; }
+    .level-tag.level-低 { background: #fde2e2; color: var(--danger); }
+    .level-tag.level-未指定 { background: #f0f0f0; color: #999; }
+
+    /* 直近の活動 */
+    details.recent-activity summary {
+      font-size: 0.78rem; color: var(--navy); cursor: pointer; font-weight: 600; padding: 2px 0;
+    }
+    .activity-row {
+      display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
+      font-size: 0.76rem; color: #555; cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .activity-row:hover { box-shadow: var(--shadow); transform: translateY(-1px); background: #fafbfc; }
+    .activity-row .activity-time { color: #999; min-width: 80px; }
+    .activity-row .activity-flag { color: var(--danger); }
+
+    /* playbook活用バー */
+    .pb-usage-row { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .pb-usage-row:last-child { border-bottom: none; }
+    .pb-usage-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .pb-type {
+      display: inline-block; font-size: 0.65rem; background: var(--navy); color: #fff;
+      border-radius: 4px; padding: 1px 6px;
+    }
+    .pb-title { font-weight: 600; color: #333; font-size: 0.8rem; }
+    .pb-usage-stat { margin-left: auto; font-size: 0.7rem; color: #999; white-space: nowrap; }
+    .pb-usage-bar { height: 8px; border-radius: 4px; background: #f0f0f0; overflow: hidden; }
+    .pb-usage-bar .fill {
+      height: 100%; background: var(--gold); border-radius: 4px; width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* エスカレーション一覧 */
+    .escalation-item {
+      background: #fff5f5;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .escalation-item:last-child { margin-bottom: 0; }
+    .escalation-item:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    .escalation-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+    .escalation-head .esc-rep { font-weight: 700; color: var(--navy); font-size: 0.85rem; }
+    .escalation-head .esc-time { margin-left: auto; font-size: 0.7rem; color: #999; }
+    .escalation-reason { font-size: 0.78rem; color: var(--danger); font-weight: 700; margin-bottom: 4px; }
+    .escalation-preview { font-size: 0.8rem; color: #555; }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 10px;
+      color: #999;
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+    .empty-state .text { font-size: 0.85rem; }
+
+    /* モーダル */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-content {
+      background: #fff; border-radius: 12px; max-width: 800px; width: 100%; max-height: 85vh;
+      overflow-y: auto; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 18px; font-size: 1.4rem; color: var(--navy);
+      cursor: pointer; border: none; background: none; line-height: 1;
+    }
+    .modal-head { margin-bottom: 14px; padding-right: 30px; }
+    .modal-head .modal-rep { font-weight: 700; color: var(--navy); font-size: 1.05rem; }
+    .modal-head .modal-time { font-size: 0.75rem; color: #999; margin-top: 2px; }
+    .meta-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+    .tag { font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; background: #eef1f5; color: #555; }
+    .tag.intervention { background: var(--danger-bg); color: var(--danger); font-weight: 700; }
+    .report-quote {
+      border-left: 3px solid var(--gold); padding: 8px 12px; background: #fafbfc;
+      font-size: 0.85rem; white-space: pre-wrap; margin: 10px 0 16px; border-radius: 0 6px 6px 0;
+    }
+    .ab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .ab-card h3 { font-size: 0.8rem; color: var(--navy); margin-bottom: 6px; }
+    .ab-card .ab-text {
+      background: #f7f8fa; border-radius: 8px; padding: 10px; font-size: 0.82rem;
+      white-space: pre-wrap; max-height: 240px; overflow-y: auto; line-height: 1.6;
+    }
+    .ab-note { font-size: 0.8rem; color: #999; padding: 10px; background: #f7f8fa; border-radius: 8px; }
+    .pb-used-tags { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .pb-used-tags h3 { font-size: 0.8rem; color: var(--navy); margin-bottom: 4px; }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .left-col { order: 2; }
+      .right-col { order: 1; }
+    }
+    @media (max-width: 768px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .ab-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">📈</span>
+    <div>
+      <h1>進捗ダッシュボード</h1>
+      <div class="sub">部下の活動報告・AIコーチング状況を可視化</div>
+    </div>
+    <span class="mode-badge" id="mode-badge">...</span>
+    <div class="header-actions">
+      <button class="btn-export outline" id="refresh-btn" onclick="refreshAll()"><span class="refresh-icon">🔄</span> 更新</button>
+      <a class="btn-export" href="/index.html">← 営業担当者ビューへ</a>
+    </div>
+  </header>
+
+  <div class="dashboard-container">
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="dashboard-grid">
+      <div class="left-col">
+        <div class="panel" id="reps-panel">
+          <h2>👥 担当者別アクティビティ <span class="count-badge" id="reps-count">0</span></h2>
+          <div id="reps-list"></div>
+        </div>
+        <div class="panel" id="playbook-panel">
+          <h2>📘 playbook活用状況（チーム全体）</h2>
+          <div id="playbook-usage-list"></div>
+        </div>
+      </div>
+
+      <div class="right-col">
+        <div class="panel" id="escalation-panel">
+          <h2>⚠ 要対応エスカレーション <span class="count-badge" id="escalation-count">0</span></h2>
+          <div id="escalation-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+
+  <script>
+    const ACTIVITY_COLORS = {
+      'コール(架電)': '#1f3a5f',
+      '初回面談(初訪)': '#3a5a85',
+      'アポ・再訪': '#5e7ca8',
+      '提案': '#c8a04d',
+      '既契約の見直し提案': '#dfc488',
+      '契約・成約': '#8a99ab',
+      'フォロー': '#b8c4d2',
+      '未指定': '#e8ecf1',
+    };
+
+    let playbookById = new Map();
+    let logsById = new Map();
+
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${mm}/${dd} ${hh}:${mi}`;
+    }
+
+    async function loadMeta() {
+      const meta = await fetch('/api/meta').then(r => r.json());
+      const modeBadge = document.getElementById('mode-badge');
+      if (meta.mode === 'claude') {
+        modeBadge.textContent = '✅ Claudeモード';
+        modeBadge.className = 'mode-badge claude';
+      } else {
+        modeBadge.textContent = '🔶 デモモード';
+        modeBadge.className = 'mode-badge demo';
+      }
+    }
+
+    async function loadPlaybook() {
+      const playbook = await fetch('/api/playbook').then(r => r.json());
+      const all = [
+        ...(playbook.winningPatterns || []).map(p => ({ id: p.id, type: '勝ちパターン', title: p.title })),
+        ...(playbook.talkScripts || []).map(p => ({ id: p.id, type: 'トークスクリプト', title: p.scene })),
+        ...(playbook.objectionHandling || []).map(p => ({ id: p.id, type: '反論対応', title: p.objection })),
+      ];
+      playbookById = new Map(all.map(item => [item.id, item]));
+    }
+
+    async function loadLogs() {
+      const data = await fetch('/api/logs').then(r => r.json());
+      logsById = new Map((data.logs || []).map(log => [log.id, log]));
+    }
+
+    function renderKpis(overview) {
+      const grid = document.getElementById('kpi-grid');
+      const avg = overview.avgPlaybookItemsPerReport.toFixed(1);
+      const cards = [
+        { label: '総報告数', value: overview.totalReports, sub: `本日: ${overview.reportsToday}件` },
+        { label: '活動中の担当者数', value: overview.activeReps, sub: '' },
+        {
+          label: '要対応エスカレーション', value: overview.pendingInterventions, sub: '',
+          danger: overview.pendingInterventions > 0,
+        },
+        { label: '平均playbook参照数(1件あたり)', value: avg, sub: '' },
+      ];
+      grid.innerHTML = cards.map(c => `
+        <div class="kpi-card${c.danger ? ' danger' : ''}">
+          <div class="kpi-label">${escapeHtml(c.label)}</div>
+          <div class="kpi-value">${escapeHtml(String(c.value))}</div>
+          ${c.sub ? `<div class="kpi-sub">${escapeHtml(c.sub)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderActivityBar(activityTypeCounts) {
+      const total = Object.values(activityTypeCounts).reduce((a, b) => a + b, 0);
+      const segs = Object.entries(activityTypeCounts).map(([type, count]) => {
+        const grow = total > 0 ? count : 0;
+        const color = ACTIVITY_COLORS[type] || '#e8ecf1';
+        const title = `${type}: ${count}件`;
+        return `<div class="seg" title="${escapeHtml(title)}" style="flex-grow:${grow || 0.01}; background:${color};"></div>`;
+      });
+      return `<div class="activity-bar">${segs.join('')}</div>`;
+    }
+
+    function renderLevelTags(prospectLevelCounts) {
+      return `<div class="level-tags">${Object.entries(prospectLevelCounts).map(([level, count]) =>
+        `<span class="level-tag level-${escapeHtml(level)}">見込み度 ${escapeHtml(level)}: ${count}</span>`
+      ).join('')}</div>`;
+    }
+
+    function renderRecentActivity(reporterId, recentActivity) {
+      if (recentActivity.length === 0) {
+        return `<div style="font-size:0.76rem; color:#999;">活動報告はまだありません</div>`;
+      }
+      const rows = recentActivity.map(a => `
+        <div class="activity-row" onclick="openModal('${escapeHtml(a.id)}')">
+          <span class="activity-time">${formatDateTime(a.timestamp)}</span>
+          <span>${escapeHtml(a.activityType)}</span>
+          <span>${escapeHtml(a.customerType)}</span>
+          <span>見込み度:${escapeHtml(a.prospectLevel)}</span>
+          ${a.intervention.flag ? '<span class="activity-flag">⚠</span>' : ''}
+        </div>
+      `).join('');
+      return `
+        <details class="recent-activity">
+          <summary>直近の活動を表示</summary>
+          ${rows}
+        </details>
+      `;
+    }
+
+    function renderReps(reps) {
+      document.getElementById('reps-count').textContent = reps.length;
+      const list = document.getElementById('reps-list');
+      if (reps.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <div class="text">まだ活動報告がありません</div>
+          </div>`;
+        return;
+      }
+      list.innerHTML = reps.map(rep => `
+        <div class="rep-card">
+          <div class="rep-card-head">
+            <span class="rep-name${rep.reporterId === '未指定' ? ' unspecified' : ''}">${escapeHtml(rep.reporterId)}</span>
+            <span class="rep-count">${rep.totalReports}件</span>
+            ${rep.interventionCount > 0 ? `<span class="rep-alert">⚠ ${rep.interventionCount}件要対応</span>` : ''}
+            <span class="rep-time">最終活動: ${formatDateTime(rep.lastActivityAt)}</span>
+          </div>
+          ${renderActivityBar(rep.activityTypeCounts)}
+          ${renderLevelTags(rep.prospectLevelCounts)}
+          ${renderRecentActivity(rep.reporterId, rep.recentActivity)}
+        </div>
+      `).join('');
+    }
+
+    function renderPlaybookUsage(playbookUsage) {
+      const list = document.getElementById('playbook-usage-list');
+      if (playbookUsage.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📘</div>
+            <div class="text">まだ参照されたplaybook項目はありません</div>
+          </div>`;
+        return;
+      }
+      const max = Math.max(...playbookUsage.map(p => p.usageCount));
+      list.innerHTML = playbookUsage.map(p => `
+        <div class="pb-usage-row">
+          <div class="pb-usage-head">
+            <span class="pb-type">${escapeHtml(p.type)}</span>
+            <span class="pb-title">${escapeHtml(p.title)}</span>
+            <span class="pb-usage-stat">${p.usageCount}回 / ${p.repsUsing}名が参照</span>
+          </div>
+          <div class="pb-usage-bar"><div class="fill" style="width:${max > 0 ? (p.usageCount / max * 100) : 0}%"></div></div>
+        </div>
+      `).join('');
+    }
+
+    function renderEscalations(interventions) {
+      document.getElementById('escalation-count').textContent = interventions.length;
+      const panel = document.getElementById('escalation-panel');
+      const list = document.getElementById('escalation-list');
+      if (interventions.length === 0) {
+        panel.classList.remove('danger-accent');
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">✅</div>
+            <div class="text">現在、要対応のエスカレーションはありません</div>
+          </div>`;
+        return;
+      }
+      panel.classList.add('danger-accent');
+      list.innerHTML = interventions.map(i => `
+        <div class="escalation-item" onclick="openModal('${escapeHtml(i.id)}')">
+          <div class="escalation-head">
+            <span class="esc-rep">${escapeHtml(i.reporterId)}</span>
+            <span class="esc-time">${formatDateTime(i.timestamp)}</span>
+          </div>
+          <div class="escalation-reason">⚠ ${escapeHtml(i.reason)}</div>
+          <div class="escalation-preview">${escapeHtml(i.reportTextPreview)}</div>
+        </div>
+      `).join('');
+    }
+
+    function openModal(id) {
+      const log = logsById.get(id);
+      if (!log) return;
+      const content = document.getElementById('modal-content');
+
+      const tags = [
+        `<span class="tag">${escapeHtml(log.customerType)}</span>`,
+        `<span class="tag">${escapeHtml(log.activityType)}</span>`,
+        `<span class="tag">見込み度: ${escapeHtml(log.prospectLevel)}</span>`,
+      ];
+      if (log.intervention && log.intervention.flag) {
+        tags.push(`<span class="tag intervention">⚠ 上長エスカレーション推奨: ${escapeHtml(log.intervention.reason)}</span>`);
+      }
+
+      let abSection;
+      if (log.outputA !== null && log.outputA !== undefined) {
+        abSection = `
+          <div class="ab-grid">
+            <div class="ab-card">
+              <h3>出力A（playbook未参照）</h3>
+              <div class="ab-text">${escapeHtml(log.outputA)}</div>
+            </div>
+            <div class="ab-card">
+              <h3>出力B（playbook参照あり）</h3>
+              <div class="ab-text">${escapeHtml(log.outputB)}</div>
+            </div>
+          </div>`;
+      } else {
+        abSection = `
+          <div class="ab-note">（2回目以降の応答のため、A/B比較は記録されていません）</div>
+          <div class="ab-card" style="margin-top:10px;">
+            <h3>AIフィードバック</h3>
+            <div class="ab-text">${escapeHtml(log.outputB)}</div>
+          </div>`;
+      }
+
+      const pbTags = (log.playbookItemsUsed || []).map(itemId => {
+        const item = playbookById.get(itemId) || { type: '不明', title: itemId };
+        return `<div class="pb-item"><span class="pb-type">${escapeHtml(item.type)}</span><div class="pb-title">${escapeHtml(item.title)}</div></div>`;
+      }).join('');
+
+      content.innerHTML = `
+        <button class="modal-close" onclick="closeModal()">×</button>
+        <div class="modal-head">
+          <div class="modal-rep">${escapeHtml(log.reporterId)}</div>
+          <div class="modal-time">${formatDateTime(log.timestamp)}（第${log.turn}回）</div>
+        </div>
+        <div class="meta-tags">${tags.join('')}</div>
+        <div class="report-quote">${escapeHtml(log.reportText)}</div>
+        ${abSection}
+        ${pbTags ? `<div class="pb-used-tags"><h3>参照されたplaybook項目</h3>${pbTags}</div>` : ''}
+      `;
+      document.getElementById('modal-overlay').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('open');
+    }
+
+    async function refreshAll() {
+      const btn = document.getElementById('refresh-btn');
+      btn.classList.add('spinning');
+      try {
+        await loadDashboard();
+      } finally {
+        setTimeout(() => btn.classList.remove('spinning'), 500);
+      }
+    }
+
+    async function loadDashboard() {
+      const [summary] = await Promise.all([
+        fetch('/api/dashboard/summary').then(r => r.json()),
+        loadLogs(),
+      ]);
+      renderKpis(summary.overview);
+      renderReps(summary.reps);
+      renderPlaybookUsage(summary.playbookUsage);
+      renderEscalations(summary.interventions);
+    }
+
+    async function init() {
+      await Promise.all([loadMeta(), loadPlaybook()]);
+      await loadDashboard();
+    }
+
+    init();
+  </script>
+</body>
+</html>

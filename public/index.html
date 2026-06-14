@@ -41,7 +41,6 @@
     header h1 { font-size: 1.05rem; font-weight: 700; }
     header .sub { font-size: 0.7rem; opacity: 0.75; margin-top: 1px; }
     .mode-badge {
-      margin-left: auto;
       font-size: 0.72rem;
       padding: 3px 10px;
       border-radius: 20px;
@@ -49,6 +48,12 @@
     }
     .mode-badge.claude { background: rgba(255,255,255,0.18); }
     .mode-badge.demo   { background: rgba(255,200,0,0.25); color: #ffe066; }
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
     .btn-export {
       font-size: 0.72rem;
       padding: 5px 12px;
@@ -58,6 +63,8 @@
       border: none;
       cursor: pointer;
       font-weight: 700;
+      text-decoration: none;
+      display: inline-block;
     }
     .btn-export:hover { opacity: 0.9; }
 
@@ -173,7 +180,10 @@
       <div class="sub">活動報告 → AIコーチによる即時フィードバック</div>
     </div>
     <span class="mode-badge" id="mode-badge">...</span>
-    <button class="btn-export" onclick="exportLogs()">📊 ログ出力</button>
+    <div class="header-actions">
+      <a class="btn-export" href="/dashboard.html">📈 進捗ダッシュボード</a>
+      <button class="btn-export" onclick="exportLogs()">📊 ログ出力</button>
+    </div>
   </header>
 
   <div class="main">

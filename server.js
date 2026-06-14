@@ -14,6 +14,7 @@ const {
 } = require('./lib/coaching');
 const { appendLog, readLogs } = require('./lib/logStore');
 const { buildWorkbook } = require('./lib/exportLogs');
+const { buildDashboardSummary } = require('./lib/dashboard');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,6 +137,11 @@ app.post('/api/report', async (req, res) => {
 // ログ一覧API（簡易確認用）
 app.get('/api/logs', (req, res) => {
   res.json({ logs: readLogs() });
+});
+
+// 上長向け進捗ダッシュボード集計API
+app.get('/api/dashboard/summary', (req, res) => {
+  res.json(buildDashboardSummary(readLogs(), playbookItems));
 });
 
 // ログ・A/B評価用シートのエクスポートAPI
