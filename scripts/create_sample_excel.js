@@ -4,6 +4,7 @@
  */
 const XLSX = require('xlsx');
 const path = require('path');
+const fs = require('fs');
 
 const data = [
   ['カテゴリ', '質問', '回答', 'キーワード'],
@@ -138,6 +139,15 @@ worksheet['!cols'] = [
 XLSX.utils.book_append_sheet(workbook, worksheet, 'ナレッジベース');
 
 const outputPath = path.join(__dirname, '..', 'qa_knowledge.xlsx');
+
+// 運用中のKB（正本）を初期サンプルで誤上書きしないためのガード
+if (fs.existsSync(outputPath) && !process.argv.includes('--force')) {
+  console.error(`⛔ ${outputPath} は既に存在します。`);
+  console.error('   初期サンプルに戻す場合のみ --force を付けて実行してください:');
+  console.error('   node scripts/create_sample_excel.js --force');
+  process.exit(1);
+}
+
 XLSX.writeFile(workbook, outputPath);
 console.log(`✅ Excelファイルを作成しました: ${outputPath}`);
 console.log(`📋 合計 ${data.length - 1} 件のQ&Aを登録しました`);
